@@ -1,0 +1,27 @@
+{
+  "name": "@flowdevs/nerdio-nmm-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only MCP adapter for Nerdio Manager for MSP using the community nerdio-cli",
+  "type": "module",
+  "bin": {
+    "nerdio-nmm-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "check": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
