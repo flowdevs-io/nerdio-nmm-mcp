@@ -1,37 +1,51 @@
 # Nerdio NMM MCP Server
 
-Community-led, open-source Model Context Protocol (MCP) integration for **Nerdio Manager for MSP (NMM)**, developed under the FlowDevs organization.
+A standalone [Model Context Protocol](https://modelcontextprotocol.io/) server for **Nerdio Manager for MSP**, developed by FlowDevs. Connect a local MCP client to account-scoped inventory and human-approved operational tools. Node.js 20+ is required; no Nerdio CLI is needed.
 
-> **Status: bootstrap / pre-alpha.** No production-ready MCP executable has been released from this repository yet. Do not connect production customer environments until authentication, authorization, and tenant isolation are verified.
+The native API client uses OAuth client credentials, keeps tokens in memory, enforces an explicit customer allowlist, handles bounded pagination and read retries, and redacts secret fields. Writes are disabled by default and are never automatically retried.
 
-## Project goals
+## Quick start
 
-- Provide safe, discoverable NMM capabilities to MCP clients (Claude, ChatGPT, Codex, and others).
-- Start with **read-only** account, host-pool, session-host, autoscale, and job discovery.
-- Require tenant/account boundaries, explicit approvals, audit logs, and allowlisted actions before offering write operations.
-- Track asynchronous NMM jobs and report outcomes rather than assuming success.
-- Make local development and contributions straightforward.
+```sh
+npm ci --ignore-scripts
+npm test
+```
 
-## Prior art and upstream acknowledgment
+Configure the environment described in [.env.example](.env.example) and [the installation guide](docs/INSTALL.md), then run:
 
-Servosity's [msp-skills/skills/nerdio](https://github.com/Servosity/msp-skills/tree/main/skills/nerdio) includes an existing `nerdio-mcp` binary and `nerdio-cli` tooling. It is Apache-2.0-licensed. **This repository has not yet copied, forked, or vendored that implementation.** We will evaluate its source, licensing notices, release provenance, and API coverage before deciding whether to incorporate it.
+```sh
+node dist/index.js doctor
+node dist/index.js
+```
 
-Other resources: [Nerdio's NMM-PS integration](https://github.com/Get-Nerdio/NMM-PS) (unofficial), and NMM's API documentation in your Nerdio deployment.
+`doctor` checks OAuth and reads host pools for the first authorized account. The default command serves MCP over stdio. `--help` describes the local operator commands.
 
-## Planned milestones
+## Available tools
 
-1. Document NMM API authentication and supported endpoint map.
-2. Implement local stdio transport, a narrow tool registry, and API client.
-3. Add cross-account inventory, typed schemas, pagination, retry/backoff, and test fixtures.
-4. Validate least-privilege access, account scoping, logging redaction, and negative tests.
-5. Add gated operational tools and optional HTTPS transport with authentication.
+| Tool | Capability |
+| --- | --- |
+| `list_accounts` | All accounts; explicit cross-account discovery opt-in required |
+| `list_host_pools` | Host pools for an allowed account |
+| `list_session_hosts` | Hosts using account, subscription, resource group and pool name |
+| `list_sessions` | Active sessions in an allowed pool |
+| `get_autoscale` | Full pool autoscale configuration |
+| `get_job` | Unrelated job status; explicit global-job opt-in required |
+| `prepare_host_action` | Reviewable host start, stop/deallocate or restart request |
+| `prepare_autoscale_update` | Reviewable full autoscale configuration replacement |
+| `execute_action` | Send an approved operation once |
+| `get_action_status` | Refresh the job for an account-authorized action |
+| `wait_for_action` | Wait up to 30 seconds for that job; repeat for long-running jobs |
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) and [SECURITY.md](SECURITY.md).
+Stop and restart can interrupt users. An operator reviews the exact immutable request locally, approves its digest, and then the MCP client executes it. Approval expires ten minutes after preparation and can be consumed once. A job submission is reported separately from completion. See [the approval workflow](docs/INSTALL.md#operational-approval-workflow).
 
-## Contributing
+## Validation and scope
 
-Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Please **never commit** Nerdio customer data, tokens, app secrets, device passwords, BitLocker recovery keys, or production logs.
+The executable and supported contracts are tested with local API fixtures and real MCP transports. **Live tenant validation has not been performed.** Verify deployment-specific permissions and responses in a test tenant before production use; see [validation evidence and live checks](docs/VALIDATION.md).
 
-## License
+Transport is local stdio for a trusted operator. Hosted HTTP, delegated per-user authorization, session mutations, provisioning and arbitrary API forwarding are outside this release. Read calls expose business data such as user sessions; use only authorized customer environments. See [SECURITY.md](SECURITY.md).
 
-Apache License 2.0. See [LICENSE](LICENSE). Nerdio is a trademark of its respective owner; this community project is not officially affiliated with or endorsed by Nerdio.
+## API references and attribution
+
+Endpoints and authentication were checked against public source in [Servosity/msp-skills](https://github.com/Servosity/msp-skills/tree/f4545906b8eb5bcbe7dd49dfdd29ea7b232838bc/skills/nerdio/cli) and [Get-Nerdio/NMM-PS](https://github.com/Get-Nerdio/NMM-PS/tree/b8e2b95228fc137cdc6bf2490fe6f05ac9ebb1d5). This is an independent implementation; upstream source and executables are not copied or bundled. [API contracts](docs/API.md) records exact routes and reference files.
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Apache-2.0; see [LICENSE](LICENSE). This community project is not affiliated with or endorsed by Nerdio.

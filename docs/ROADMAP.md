@@ -1,30 +1,32 @@
-# Implementation roadmap
+# Roadmap
 
-## Phase 0: validate upstream and API contracts
-- [ ] Audit [Servosity's existing Nerdio implementation](https://github.com/Servosity/msp-skills/tree/main/skills/nerdio) to locate buildable MCP source, releases, licenses and NOTICE requirements.
-- [ ] Confirm NMM REST API version, tenant-specific base URL, OAuth token audience/scope, and published OpenAPI schema.
-- [ ] Publish a verified endpoint/permission matrix, with documentation references.
-- [ ] Record security model and threat assessment.
+## Implemented locally
 
-## Phase 1: MVP read-only MCP
-- [ ] Choose implementation strategy: wrap audited upstream Go binaries/source or independent typed client.
-- [ ] Expose `list_accounts`, `list_host_pools`, `list_session_hosts`, `get_autoscale_configuration`, `get_job` only after API endpoint verification.
-- [ ] Add pagination, structured errors, timeouts and rate-limit handling.
-- [ ] Add local stdio transport and smoke tests.
-- [ ] Restrict access to allowed account IDs.
-- [ ] Document installation for Claude Desktop and local development.
+- Native OAuth client credentials and standalone stdio executable.
+- Account, host-pool, host, session, autoscale and job reads on verified public routes.
+- Explicit account authorization and separate global read opt-ins.
+- Bounded read retry, token refresh, pagination, deadlines and response sizes.
+- Secret-field redaction and safe error messages.
+- Operator-approved host start/stop/restart and full autoscale updates.
+- Expiring request digests, deployment/principal binding, single-use execution claims and metadata audit records.
+- Account-authorized action-job status, bounded waiting and explicit failed/unknown outcomes.
+- Synthetic API integration, real MCP transport, stdio and negative security tests.
+- Dependency lockfile, package build and Node 20/22/24 CI configuration.
 
-## Phase 2: hardened operations
-- [ ] Add principal-to-account authorization and production-grade redaction.
-- [ ] Implement approval-gated restart, drain-mode, session management and other supported operations.
-- [ ] Wait for asynchronous Nerdio jobs and verify terminal status.
-- [ ] Record audit events and add negative integration tests.
+## Live release gate
 
-## Phase 3: hosted MCP / integration
-- [ ] Add authenticated remote Streamable HTTP behind TLS with per-user authorization.
-- [ ] Package release binaries or signed containers.
-- [ ] Integrate FlowPilot/FlowRMM optionally, without coupling core MCP service.
-- [ ] Publish maintenance, contribution and vulnerability-handling guidance.
+- Validate authentication and minimum role permissions in a real test NMM tenant.
+- Verify list response shapes, available pagination and required autoscale fields for that deployment.
+- Execute an explicitly operator-approved disposable host action and observe its job to completion.
+- Verify deployment job IDs/status fields and account permissions.
+- Record live evidence without credentials or customer payloads and complete deployment security review.
 
-## Release gate
-No production-ready claim until live NMM tenant tests and security review are documented. No automatic write actions in v0.1.
+## Future scope
+
+- Additional publicly verified operations, including session mutations when contracts are available.
+- Certificate-based OAuth client assertions.
+- Hosted authenticated MCP with per-principal account authorization.
+- Action revocation and operator audit-retention controls.
+- Release publication and signed delivery artifacts.
+
+A passing fixture suite is not evidence of successful live deployment.

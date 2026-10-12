@@ -1,54 +1,42 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import { isAuthorizedAccount, READ_ONLY_COMMANDS, runReadOnly } from "./cli.js";
+import { createServer, VERSION } from "./server.js";
+import { authorize, loadConfig } from "./config.js";
+import { safeError } from "./errors.js";
 
-const server = new McpServer({ name: "flowdevs-nerdio-nmm", version: "0.1.0" });
-const accountId = z.string().regex(/^\d+$/).describe("Authorized NMM customer account ID");
-const resourceId = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).describe("NMM resource identifier");
-
-function response(value: string) {
-  return { content: [{ type: "text" as const, text: value }] };
+const [command, ...args] = process.argv.slice(2);
+try {
+  if (command === "--help" || command === "help") {
+    console.log(`Nerdio NMM MCP ${VERSION}
+Usage: nerdio-nmm-mcp [serve | doctor | review ACTION_ID | approve ACTION_ID --digest REVIEW_DIGEST]
+No arguments starts the stdio MCP server. Configure credentials and account allowlist through environment variables.
+Review and approve are local operator commands, unavailable through MCP. Approval expires after ten minutes.`);
+  } else if (command === "--version") {
+    console.log(VERSION);
+  } else {
+    const { server, client, actions } = createServer(process.env);
+    if (command === "review" && args.length === 1) {
+      console.log(JSON.stringify(await actions.review(args[0]), null, 2));
+    } else if (command === "approve" && args.length === 3 && args[1] === "--digest" && /^[a-f0-9]{64}$/.test(args[2])) {
+      await actions.approve(args[0], args[2]);
+      console.log(JSON.stringify({ action_id: args[0], state: "approved" }));
+    } else if (command === "doctor" && args.length === 0) {
+      loadConfig(process.env);
+      const account = process.env.NERDIO_ALLOWED_ACCOUNT_IDS?.split(",")[0].trim() ?? "";
+      authorize(account, process.env);
+      const result = await client.list(`/rest-api/v1/accounts/${account}/host-pool`);
+      console.log(JSON.stringify({ connected: true, authorized_account: account, host_pools: result.items.length, writes_enabled: process.env.NERDIO_ENABLE_WRITES === "true" }));
+    } else if ((command === undefined || command === "serve") && args.length === 0) {
+      await server.connect(new StdioServerTransport());
+      const shutdown = () => { void server.close().finally(() => process.stdin.destroy()); };
+      process.once("SIGINT", shutdown);
+      process.once("SIGTERM", shutdown);
+    } else {
+      console.error("Invalid arguments. Use nerdio-nmm-mcp --help.");
+      process.exitCode = 2;
+    }
+  }
+} catch (error) {
+  console.error(JSON.stringify(safeError(error)));
+  process.exitCode = 1;
 }
-async function accountCall(command: readonly string[], account: string, ...extra: string[]) {
-  if (!isAuthorizedAccount(account, process.env.NERDIO_ALLOWED_ACCOUNT_IDS))
-    throw new Error("Account is not on this server's explicit authorization allowlist");
-  return response(await runReadOnly(command, [account, ...extra]));
-}
-
-server.registerTool("list_accounts", {
-  description: "List NMM MSP customer accounts. Only use in a single-operator, locally trusted MCP setup.",
-  inputSchema: {},
-}, async () => {
-  // The CLI returns all accounts; prevent cross-customer disclosure unless explicitly opted in.
-  if (process.env.NERDIO_ALLOW_ACCOUNT_DISCOVERY !== "true")
-    throw new Error("Account enumeration disabled. Set NERDIO_ALLOW_ACCOUNT_DISCOVERY=true for a trusted local operator.");
-  return response(await runReadOnly(READ_ONLY_COMMANDS.accounts));
-});
-
-server.registerTool("list_host_pools", {
-  description: "Read host pools for an explicitly authorized NMM customer account.",
-  inputSchema: { account_id: accountId },
-}, async ({ account_id }) => accountCall(READ_ONLY_COMMANDS.hostPools, account_id));
-
-server.registerTool("list_session_hosts", {
-  description: "Read session hosts for an authorized account and host pool.",
-  inputSchema: { account_id: accountId, host_pool_id: resourceId },
-}, async ({ account_id, host_pool_id }) => accountCall(READ_ONLY_COMMANDS.hosts, account_id, host_pool_id));
-
-server.registerTool("get_autoscale", {
-  description: "Read the autoscale configuration for an authorized customer's host pool.",
-  inputSchema: { account_id: accountId, host_pool_id: resourceId },
-}, async ({ account_id, host_pool_id }) => accountCall(READ_ONLY_COMMANDS.autoscale, account_id, host_pool_id));
-
-server.registerTool("get_job", {
-  description: "Get an NMM asynchronous job status. Restricted to trusted local operators because job IDs may span accounts.",
-  inputSchema: { job_id: resourceId },
-}, async ({ job_id }) => {
-  if (process.env.NERDIO_ALLOW_GLOBAL_JOBS !== "true")
-    throw new Error("Global job lookup disabled. Set NERDIO_ALLOW_GLOBAL_JOBS=true only for a trusted local operator.");
-  return response(await runReadOnly(READ_ONLY_COMMANDS.job, [job_id]));
-});
-
-await server.connect(new StdioServerTransport());

@@ -1,0 +1,15 @@
+# Functional NMM server
+
+The authorized scope includes operational write tools. Replace the incomplete CLI adapter with a native Node.js 20+ REST client and retain local stdio MCP transport. No external executable is required. Support accounts, host pools, hosts, sessions, autoscale configuration, global opt-in job reads, and jobs associated with this server's actions.
+
+Use OAuth client credentials from environment variables. Cache tokens in memory, refresh once on read-side 401s, retry bounded GET failures and rate limits, and follow bounded same-origin pagination only. Never retry a mutation, follow an HTTP redirect, expose raw error bodies, or persist credentials. All network calls and response bodies have deadlines and size limits. Require HTTPS in production.
+
+Account access fails closed against an explicit allowlist. Pool requests require account ID, subscription ID, resource group and pool name. Validate path segments; allow numeric and UUID account IDs. Cross-account enumeration and unrelated job lookup require separate explicit operator opt-ins. Redact secret fields and configured credential values from model-visible results.
+
+Operational tools support host start, stop, restart and full autoscale configuration replacement. An MCP tool prepares an immutable request; local `review` and `approve` commands let the human inspect and approve it outside MCP. Approval is bound to the exact request, deployment and OAuth principal, expires after ten minutes, and can be consumed once. Execution rechecks account authorization and requires writes explicitly enabled. Persist action state in a private directory; prevent concurrent execution/replay with an exclusive claim. A crash or network error after a mutation is ambiguous and must never cause automatic replay. Persist job IDs and expose account-authorized action status/wait tools. Report job failure as failure; acceptance is not completion.
+
+Use a local audit trail containing action IDs, account scope, operation, approval, attempt and outcome metadata. Do not persist API response payloads or credentials. Stdout belongs exclusively to MCP while serving.
+
+Verify with a real local HTTP fixture through the native client, real MCP in-memory transport, subprocess stdio smoke tests, negative authorization and approval tests, and Node 20/22 CI. The operator subsequently confirmed that no test tenant or credential source exists and requested no test validation; live deployment checks are therefore not part of this implementation handoff. Live behavior must remain clearly labeled unverified. Session reads are supported; session mutations are excluded until their public API contract is verified.
+
+Contract evidence: Servosity/msp-skills revision f4545906b8eb5bcbe7dd49dfdd29ea7b232838bc, `skills/nerdio/cli/internal/cli/{hosts_*,host-pools_*,job_get,promoted_accounts}.go`; Get-Nerdio/NMM-PS revision b8e2b95228fc137cdc6bf2490fe6f05ac9ebb1d5, `Public/{Connect-NMMApi,Get-NMMHost,Get-NMMHostPoolSession,Set-NMMAutoscale}.ps1`. Independent implementation; no upstream code copied.

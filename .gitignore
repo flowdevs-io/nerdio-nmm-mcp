@@ -9,3 +9,5 @@ coverage/
 *.pem
 *.pfx
 *.key
+*.tgz
+.nmm-state/
